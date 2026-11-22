@@ -171,37 +171,19 @@ async def entrypoint(ctx: JobContext):
         instructions="Greet the caller warmly as the Sunrise Salon receptionist and ask how you can help today."
     )
 
-
 try:
     from livekit.agents import JobExecutorType
     _EXECUTOR_KW = {"job_executor_type": JobExecutorType.THREAD}
 except ImportError:
     _EXECUTOR_KW = {}
-
-try:
-    from livekit.agents import JobExecutorType
-    _EXECUTOR_KW = {"job_executor_type": JobExecutorType.THREAD}
-except ImportError:
-    _EXECUTOR_KW = {}
-
-import inspect as _inspect
-from livekit.agents import JobExecutorType as _JET
-_THREAD_OPTS = {'job_executor_type': _JET.THREAD} if 'job_executor_type' in _inspect.signature(WorkerOptions).parameters else {}
-
-import inspect as _inspect
-from livekit.agents import JobExecutorType as _JET
-_THREAD_OPTS = {'job_executor_type': _JET.THREAD} if 'job_executor_type' in _inspect.signature(WorkerOptions).parameters else {}
 
 if __name__ == "__main__":
     cli.run_app(
         WorkerOptions(
-            **_THREAD_OPTS,
-            **_THREAD_OPTS,
             entrypoint_fnc=entrypoint,
             num_idle_processes=0,
             load_threshold=0.95,
             initialize_process_timeout=60.0,
-            **_EXECUTOR_KW,
             **_EXECUTOR_KW,
         )
     )
