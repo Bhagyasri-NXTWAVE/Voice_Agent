@@ -184,11 +184,15 @@ try:
 except ImportError:
     _EXECUTOR_KW = {}
 
+import inspect as _inspect
+from livekit.agents import JobExecutorType as _JET
+_THREAD_OPTS = {'job_executor_type': _JET.THREAD} if 'job_executor_type' in _inspect.signature(WorkerOptions).parameters else {}
+
 if __name__ == "__main__":
     cli.run_app(
         WorkerOptions(
+            **_THREAD_OPTS,
             entrypoint_fnc=entrypoint,
-            prewarm_fnc=prewarm,
             num_idle_processes=0,
             load_threshold=0.95,
             initialize_process_timeout=60.0,
