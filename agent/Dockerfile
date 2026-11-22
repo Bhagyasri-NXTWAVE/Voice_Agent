@@ -13,6 +13,9 @@ RUN mkdir -p /app/models && \
     curl -L -o /app/models/kokoro-v1.0.onnx https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.onnx && \
     curl -L -o /app/models/voices-v1.0.bin https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin
 
+RUN python -c "from onnxruntime.quantization import quantize_dynamic, QuantType; quantize_dynamic('/app/models/kokoro-v1.0.onnx', '/app/models/kokoro-q8.onnx', weight_type=QuantType.QUInt8)" && \
+    mv /app/models/kokoro-q8.onnx /app/models/kokoro-v1.0.onnx
+
 COPY . .
 
 CMD ["python", "main.py", "start"]
