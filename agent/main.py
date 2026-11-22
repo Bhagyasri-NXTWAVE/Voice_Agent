@@ -1,4 +1,4 @@
-import asyncio
+﻿import asyncio
 import logging
 import os
 import uuid
@@ -18,7 +18,6 @@ from livekit.agents import (
     cli,
     function_tool,
     tts,
-    utils,
 )
 from livekit.plugins import groq, silero
 
