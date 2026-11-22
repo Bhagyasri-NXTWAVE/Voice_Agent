@@ -1,10 +1,16 @@
 import asyncio
+import gc
 import logging
+import os
 import re
 import uuid
 import numpy as np
+import onnxruntime as ort
 from kokoro_onnx import Kokoro
 from livekit.agents import tts, APIConnectOptions
+
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+os.environ.setdefault("MALLOC_ARENA_MAX", "2")
 
 logger = logging.getLogger("kokoro-tts")
 _KOKORO_INSTANCE: Kokoro | None = None
@@ -13,7 +19,27 @@ _KOKORO_INSTANCE: Kokoro | None = None
 def _get_kokoro(model_path: str, voices_path: str) -> Kokoro:
     global _KOKORO_INSTANCE
     if _KOKORO_INSTANCE is None:
-        _KOKORO_INSTANCE = Kokoro(model_path, voices_path)
+        orig_session = ort.InferenceSession
+
+        def _low_mem_session(path_or_bytes, sess_options=None, providers=None, **kwargs):
+            opts = sess_options or ort.SessionOptions()
+            opts.intra_op_num_threads = 1
+            opts.inter_op_num_threads = 1
+            opts.enable_cpu_mem_arena = False
+            opts.enable_mem_pattern = False
+            return orig_session(
+                path_or_bytes,
+                sess_options=opts,
+                providers=providers or ["CPUExecutionProvider"],
+                **kwargs,
+            )
+
+        ort.InferenceSession = _low_mem_session
+        try:
+            _KOKORO_INSTANCE = Kokoro(model_path, voices_path)
+        finally:
+            ort.InferenceSession = orig_session
+        gc.collect()
     return _KOKORO_INSTANCE
 
 
@@ -30,7 +56,8 @@ class KokoroTTS(tts.TTS):
             sample_rate=24000,
             num_channels=1,
         )
-        self._kokoro = _get_kokoro(model_path, voices_path)
+        self._model_path = model_path
+        self._voices_path = voices_path
         self._voice = voice
         self._speed = speed
 
@@ -65,14 +92,16 @@ class _KokoroChunkedStream(tts.ChunkedStream):
         if not text:
             return
 
+        kokoro = await asyncio.to_thread(
+            _get_kokoro, self._tts._model_path, self._tts._voices_path
+        )
         samples, sample_rate = await asyncio.to_thread(
-            self._tts._kokoro.create,
+            kokoro.create,
             text,
             voice=self._tts._voice,
             speed=self._tts._speed,
             lang="en-us",
         )
-        # Add 120ms trailing silence so final consonants (e.g. "services") never clip
         pad = np.zeros(int(sample_rate * 0.12), dtype=np.float32)
         samples = np.concatenate([samples, pad])
         pcm = (np.clip(samples, -1.0, 1.0) * 32767).astype(np.int16).tobytes()

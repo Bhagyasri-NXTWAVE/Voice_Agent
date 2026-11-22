@@ -18,7 +18,7 @@ from livekit.agents import (
 from livekit.plugins import groq, silero
 
 from db import Database
-from kokoro_tts import KokoroTTS, _get_kokoro
+from kokoro_tts import KokoroTTS
 
 load_dotenv()
 logger = logging.getLogger("sunrise-receptionist")
@@ -26,7 +26,6 @@ logger = logging.getLogger("sunrise-receptionist")
 
 def prewarm(proc: JobProcess):
     proc.userdata["vad"] = silero.VAD.load(activation_threshold=0.65)
-    _get_kokoro("/app/models/kokoro-v1.0.onnx", "/app/models/voices-v1.0.bin")
 
 
 def build_system_prompt(biz_ctx: dict) -> str:
@@ -155,13 +154,13 @@ async def entrypoint(ctx: JobContext):
     )
 
     session = AgentSession(
-    vad=vad,
-    stt=groq.STT(model="whisper-large-v3-turbo"),
-    llm=groq.LLM(model="openai/gpt-oss-120b"),
-    tts=KokoroTTS(),
-    allow_interruptions=False,
-    min_endpointing_delay=0.4,
-)
+        vad=vad,
+        stt=groq.STT(model="whisper-large-v3-turbo"),
+        llm=groq.LLM(model="openai/gpt-oss-120b"),
+        tts=KokoroTTS(),
+        allow_interruptions=False,
+        min_endpointing_delay=0.4,
+    )
 
     await session.start(
         room=ctx.room,
@@ -178,8 +177,8 @@ if __name__ == "__main__":
         WorkerOptions(
             entrypoint_fnc=entrypoint,
             prewarm_fnc=prewarm,
-            num_idle_processes=1,
+            num_idle_processes=0,
             load_threshold=0.95,
-            initialize_process_timeout=30.0,
+            initialize_process_timeout=60.0,
         )
     )
