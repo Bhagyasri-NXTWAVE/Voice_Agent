@@ -157,7 +157,7 @@ async def entrypoint(ctx: JobContext):
         vad=vad,
         stt=groq.STT(model="whisper-large-v3-turbo"),
         llm=groq.LLM(model="openai/gpt-oss-120b"),
-        tts=KokoroTTS(),
+        tts=groq.TTS(),
         allow_interruptions=False,
         min_endpointing_delay=0.4,
     )
@@ -188,9 +188,14 @@ import inspect as _inspect
 from livekit.agents import JobExecutorType as _JET
 _THREAD_OPTS = {'job_executor_type': _JET.THREAD} if 'job_executor_type' in _inspect.signature(WorkerOptions).parameters else {}
 
+import inspect as _inspect
+from livekit.agents import JobExecutorType as _JET
+_THREAD_OPTS = {'job_executor_type': _JET.THREAD} if 'job_executor_type' in _inspect.signature(WorkerOptions).parameters else {}
+
 if __name__ == "__main__":
     cli.run_app(
         WorkerOptions(
+            **_THREAD_OPTS,
             **_THREAD_OPTS,
             entrypoint_fnc=entrypoint,
             num_idle_processes=0,
