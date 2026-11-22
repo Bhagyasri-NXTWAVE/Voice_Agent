@@ -18,7 +18,6 @@ from livekit.agents import (
 from livekit.plugins import groq, silero
 
 from db import Database
-from kokoro_tts import KokoroTTS
 
 load_dotenv()
 logger = logging.getLogger("sunrise-receptionist")
