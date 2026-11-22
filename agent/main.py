@@ -1,19 +1,24 @@
 import asyncio
 import logging
 import os
+import uuid
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
+import edge_tts
 from dotenv import load_dotenv
 from livekit.agents import (
     Agent,
     AgentSession,
+    APIConnectOptions,
     JobContext,
     JobProcess,
     RunContext,
     WorkerOptions,
     cli,
     function_tool,
+    tts,
+    utils,
 )
 from livekit.plugins import groq, silero
 
@@ -21,6 +26,45 @@ from db import Database
 
 load_dotenv()
 logger = logging.getLogger("sunrise-receptionist")
+
+
+class EdgeTTS(tts.TTS):
+    def __init__(self, voice: str = "en-IN-NeerjaNeural"):
+        super().__init__(
+            capabilities=tts.TTSCapabilities(streaming=False),
+            sample_rate=24000,
+            num_channels=1,
+        )
+        self._voice = voice
+
+    def synthesize(
+        self,
+        text: str,
+        *,
+        conn_options: APIConnectOptions = APIConnectOptions(),
+    ) -> tts.ChunkedStream:
+        return _EdgeChunkedStream(
+            tts=self, input_text=text, conn_options=conn_options, voice=self._voice
+        )
+
+
+class _EdgeChunkedStream(tts.ChunkedStream):
+    def __init__(self, *, tts: EdgeTTS, input_text: str, conn_options: APIConnectOptions, voice: str):
+        super().__init__(tts=tts, input_text=input_text, conn_options=conn_options)
+        self._voice = voice
+
+    async def _run(self, output_emitter: tts.AudioEmitter) -> None:
+        output_emitter.initialize(
+            request_id=str(uuid.uuid4()),
+            sample_rate=24000,
+            num_channels=1,
+            mime_type="audio/mp3",
+        )
+        communicate = edge_tts.Communicate(self._input_text, self._voice)
+        async for chunk in communicate.stream():
+            if chunk["type"] == "audio":
+                output_emitter.push(chunk["data"])
+        output_emitter.flush()
 
 
 def prewarm(proc: JobProcess):
@@ -156,8 +200,8 @@ async def entrypoint(ctx: JobContext):
         vad=vad,
         stt=groq.STT(model="whisper-large-v3-turbo"),
         llm=groq.LLM(model="openai/gpt-oss-120b"),
-        tts=groq.TTS(),
-        allow_interruptions=False,
+        tts=EdgeTTS(voice="en-IN-NeerjaNeural"),
+        allow_interruptions=True,
         min_endpointing_delay=0.4,
     )
 
@@ -169,6 +213,7 @@ async def entrypoint(ctx: JobContext):
     await session.generate_reply(
         instructions="Greet the caller warmly as the Sunrise Salon receptionist and ask how you can help today."
     )
+
 
 try:
     from livekit.agents import JobExecutorType
