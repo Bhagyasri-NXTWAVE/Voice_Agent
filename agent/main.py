@@ -178,6 +178,12 @@ try:
 except ImportError:
     _EXECUTOR_KW = {}
 
+try:
+    from livekit.agents import JobExecutorType
+    _EXECUTOR_KW = {"job_executor_type": JobExecutorType.THREAD}
+except ImportError:
+    _EXECUTOR_KW = {}
+
 if __name__ == "__main__":
     cli.run_app(
         WorkerOptions(
@@ -186,6 +192,7 @@ if __name__ == "__main__":
             num_idle_processes=0,
             load_threshold=0.95,
             initialize_process_timeout=60.0,
+            **_EXECUTOR_KW,
             **_EXECUTOR_KW,
         )
     )
